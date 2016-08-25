@@ -8,8 +8,20 @@ import sys
 import re
 import email
 from password import *
+import urllib2
+
+time_sched = "03:27"
 
 ######################################################### FUNCTIONS
+
+def internet_on():
+    try:
+        response=urllib2.urlopen('http://google.com',timeout=5)
+        print "connected to the internet!"
+        return True
+    except urllib2.URLError as err: pass
+    print "not connected to the internet..."
+    return False
 
 def num_to_month(num):
     if num == 1:
@@ -98,12 +110,14 @@ def set_averages(sheet):
 
 ######################################################### JOB TO RUN EVERY DAY
 def job():
-    ######################################################### VARIABLES
     MAXROW = 358
     count = 0
 
     ######################################################### CONNECT
-    
+
+    while internet_on() == False:
+        time.sleep(5)
+
     conn = imaplib.IMAP4_SSL("imap.gmail.com", 993)
     conn.login(username, password)
 
@@ -184,7 +198,7 @@ def job():
     #number of spam emails now stored in count variable
     ######################################################### WRITE TO SPREADSHEET
 
-    wb = xl.load_workbook('/Users/BlakeHord/Desktop/College Spam Count.xlsx')
+    wb = xl.load_workbook('/Users/BlakeHord/Documents/Blake\'s Awesome Stuff/CountCollegeEmails/College Spam Count.xlsx')
     sheet = wb.active
 
     for num in range(2,MAXROW + 1):
@@ -207,11 +221,11 @@ def job():
             print(ctr, "Not Empty", ws.cell(row=row, column=2).value)
         ctr += 1
     '''
-    wb.save('/Users/BlakeHord/Desktop/College Spam Count.xlsx')
+    wb.save('/Users/BlakeHord/Documents/Blake\'s Awesome Stuff/CountCollegeEmails/College Spam Count.xlsx')
 
 #SCHEDULING
-schedule.every().day.at("03:29").do(job)
+schedule.every().day.at(time_sched).do(job)
 
 while True:
     schedule.run_pending()
-    time.sleep(60)
+    time.sleep(10)
