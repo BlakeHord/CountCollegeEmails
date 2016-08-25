@@ -15,12 +15,12 @@ password = "put your password here"
 Just those two lines and it will read it. I am working on making it more secure but this does the trick.
 
 ## Files this repository contains
-* schedule.py
+* CountSchedule.py
   * executes the search and logging every night at 3:27 AM, a time which can be changed to fit your needs.
 * gmailconnect.py
-  * the basics of reading and counting from a gmail inbox. The subroutines used in this scirpt were transferred over to schedule.py
+  * the basics of reading and counting from a gmail inbox. The subroutines used in this scirpt were transferred over to CountSchedule.py
 * CollectSpamEmail.py
-  * the same as gmailconnect.py but with integration with the excel document, but without the scheduling of schedule.py
+  * the same as gmailconnect.py but with integration with the excel document, but without the scheduling of CountSchedule.py
 
 ## Parameters of the search
 * The script searched the inbox named "All Mail" for every email received in the day before it is executed. 
