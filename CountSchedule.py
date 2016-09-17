@@ -11,6 +11,8 @@ from password import *
 import urllib2
 
 time_sched = "03:27"
+excel_name = "/Users/BlakeHord/Documents/Blake's Awesome Stuff/GithubProjects/CountCollegeEmails/College Spam Count.xlsx"
+blacklist = ['khan']
 
 ######################################################### FUNCTIONS
 
@@ -126,7 +128,7 @@ def job():
     ######################################################### SEARCH
 
     today = datetime.date.today()
-    yesterday = today.replace(day=today.day-1)
+    yesterday = today - datetime.timedelta(1)
 
     tostr = today.strftime('%Y/%m/%d')
     yestr = yesterday.strftime('%Y/%m/%d')
@@ -152,28 +154,28 @@ def job():
 
         ######################################################### COUNT
 
-        blacklist = ['khan']
-
         for num in range(len(ids)):
             flag = 0
             typ, msg_data = conn.fetch(ids[num], '(BODY.PEEK[HEADER])')
             for response_part in msg_data:
                 if isinstance(response_part, tuple):
-                    if 'admission'.upper() in response_part[1].upper():
+                    if 'admission'.upper() in response_part[1].upper() or ('Recruitment'.upper() in response_part[1].upper() and 'University'.upper() in response_part[1].upper()):
                         #print 'admission'.upper()
                         #print response_part[1].upper()
                         count += 1
                         flag = 1
+                        break
 
             if flag == 0:
                 typ, msg_data = conn.fetch(ids[num], '(BODY.PEEK[TEXT])')
                 for response_part in msg_data:
                     if isinstance(response_part, tuple):
-                        if 'admission'.upper() in response_part[1].upper():
+                        if 'admission'.upper() in response_part[1].upper() or ('Recruitment'.upper() in response_part[1].upper() and 'University'.upper() in response_part[1].upper()):
                             #print 'admission'.upper()
                             #print response_part[1].upper()
                             count += 1
                             flag = 1
+                            break
 
             if flag == 1:
                 typ, msg_data = conn.fetch(ids[num], '(RFC822)')
@@ -198,7 +200,7 @@ def job():
     #number of spam emails now stored in count variable
     ######################################################### WRITE TO SPREADSHEET
 
-    wb = xl.load_workbook('/Users/BlakeHord/Documents/Blake\'s Awesome Stuff/CountCollegeEmails/College Spam Count.xlsx')
+    wb = xl.load_workbook(excel_name)
     sheet = wb.active
 
     for num in range(2,MAXROW + 1):
@@ -221,7 +223,7 @@ def job():
             print(ctr, "Not Empty", ws.cell(row=row, column=2).value)
         ctr += 1
     '''
-    wb.save('/Users/BlakeHord/Documents/Blake\'s Awesome Stuff/CountCollegeEmails/College Spam Count.xlsx')
+    wb.save(excel_name)
 
 #SCHEDULING
 schedule.every().day.at(time_sched).do(job)

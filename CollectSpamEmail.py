@@ -6,8 +6,21 @@ import sys
 import re
 import email
 from password import *
+import urllib2
+
+excel_name = "/Users/BlakeHord/Documents/Blake's Awesome Stuff/GithubProjects/CountCollegeEmails/College Spam Count.xlsx"
+blacklist = ['khan']
 
 ######################################################### FUNCTIONS
+
+def internet_on():
+    try:
+        response=urllib2.urlopen('http://google.com',timeout=5)
+        print "connected to the internet!"
+        return True
+    except urllib2.URLError as err: pass
+    print "not connected to the internet..."
+    return False
 
 def num_to_month(num):
     if num == 1:
@@ -94,125 +107,119 @@ def set_averages(sheet):
         sheet[cell_str].value = letter_avg[ctr]
         ctr += 1
 
+######################################################### JOB TO RUN EVERY DAY
+def job():
+    MAXROW = 358
+    count = 0
 
-######################################################### VARIABLES
+    ######################################################### CONNECT
 
-MAXROW = 358
-count = 0
+    while internet_on() == False:
+        time.sleep(5)
 
-######################################################### CONNECT
+    conn = imaplib.IMAP4_SSL("imap.gmail.com", 993)
+    conn.login(username, password)
 
-conn = imaplib.IMAP4_SSL("imap.gmail.com", 993)
-conn.login(username, password)
+    list_response_pattern = re.compile(r'\((?P<flags>.*?)\) "(?P<delimiter>.*)" (?P<name>.*)')
 
-list_response_pattern = re.compile(r'\((?P<flags>.*?)\) "(?P<delimiter>.*)" (?P<name>.*)')
+    ######################################################### SEARCH
 
-######################################################### SEARCH
+    today = datetime.date.today()
+    yesterday = today - datetime.timedelta(1)
 
-today = datetime.date.today()
-yesterday = today.replace(day=today.day-1)
-print today
-print yesterday
+    tostr = today.strftime('%Y/%m/%d')
+    yestr = yesterday.strftime('%Y/%m/%d')
+    search = '(SINCE \"' + datetime_to_format(yestr) + '\" BEFORE \"' + datetime_to_format(tostr) + '\")'
 
-tostr = today.strftime('%Y/%m/%d')
-yestr = yesterday.strftime('%Y/%m/%d')
-search = '(SINCE \"' + datetime_to_format(yestr) + '\" BEFORE \"' + datetime_to_format(tostr) + '\")'
+    print search
 
-print search
+    try:
+        #Connect to the All Mail inbox
+        conn.select("[Gmail]/All Mail", readonly=True)
+        #Return id's of all emails since midnight last night
+        typ, msg_ids = conn.search(None, search)
+        #print the id's
+        print "All Mail ", typ, msg_ids
+    
+        if typ != 'OK': #exit if it doesn't 
+            sys.exit("Bad search for emails in last day")
 
-try:
-    #Connect to the All Mail inbox
-    conn.select("[Gmail]/All Mail", readonly=True)
-    #Return id's of all emails since midnight last night
-    typ, msg_ids = conn.search(None, search)
-    #print the id's
-    print "All Mail ", typ, msg_ids
+        ids = msg_ids[0].split(" ")
+    #    print ids
+    #    typ, msg_data = conn.fetch(id[0], '(BODY.PEEK[HEADER] FLAGS)')
+    #    print msg_data
 
-    if typ != 'OK': #exit if it doesn't 
-        sys.exit("Bad search for emails in last day")
+        ######################################################### COUNT
 
-    ids = msg_ids[0].split(" ")
-#    print ids
-#    typ, msg_data = conn.fetch(id[0], '(BODY.PEEK[HEADER] FLAGS)')
-#    print msg_data
-
-    ######################################################### COUNT
-
-    blacklist = ['khan']
-
-    for num in range(len(ids)):
-        flag = 0
-        typ, msg_data = conn.fetch(ids[num], '(BODY.PEEK[HEADER])')
-        for response_part in msg_data:
-            if isinstance(response_part, tuple):
-                if 'admission'.upper() in response_part[1].upper():
-                    #print 'admission'.upper()
-                    #print response_part[1].upper()
-                    count += 1
-                    flag = 1
-
-        if flag == 0:
-            typ, msg_data = conn.fetch(ids[num], '(BODY.PEEK[TEXT])')
+        for num in range(len(ids)):
+            flag = 0
+            typ, msg_data = conn.fetch(ids[num], '(BODY.PEEK[HEADER])')
             for response_part in msg_data:
                 if isinstance(response_part, tuple):
-                    if 'admission'.upper() in response_part[1].upper():
+                    if 'admission'.upper() in response_part[1].upper() or ('Recruitment'.upper() in response_part[1].upper() and 'University'.upper() in response_part[1].upper()):
                         #print 'admission'.upper()
                         #print response_part[1].upper()
                         count += 1
                         flag = 1
+                        break
 
-        if flag == 1:
-            typ, msg_data = conn.fetch(ids[num], '(RFC822)')
-            for response_part in msg_data:
-                if isinstance(response_part, tuple):
-                    msg = email.message_from_string(response_part[1])
-                    print count
-                    for header in [ 'subject', 'from' ]:
-                        print '%-8s: %s' % (header.upper(), msg[header])
-                    print
-                    #DSubtract one from the count if the email is from one on the blacklist
-                    for name in blacklist:
-                        if name.upper() in msg['from'].upper():
-                            count -= 1
-    print 
-    print count
-finally:
-    try:
-        conn.close()
-    except:
-        pass
-    conn.logout()
+            if flag == 0:
+                typ, msg_data = conn.fetch(ids[num], '(BODY.PEEK[TEXT])')
+                for response_part in msg_data:
+                    if isinstance(response_part, tuple):
+                        if 'admission'.upper() in response_part[1].upper() or ('Recruitment'.upper() in response_part[1].upper() and 'University'.upper() in response_part[1].upper()):
+                            #print 'admission'.upper()
+                            #print response_part[1].upper()
+                            count += 1
+                            flag = 1
+                            break
 
-#number of spam emails now stored in count variable
+            if flag == 1:
+                typ, msg_data = conn.fetch(ids[num], '(RFC822)')
+                for response_part in msg_data:
+                    if isinstance(response_part, tuple):
+                        msg = email.message_from_string(response_part[1])
+                        print count
+                        for header in [ 'subject', 'from' ]:
+                            print '%-8s: %s' % (header.upper(), msg[header])
+                        #Subtract one from the count if the email is from one on the blacklist
+                        for name in blacklist:
+                            if name.upper() in msg['from'].upper():
+                                count -= 1
+        print count
+    finally:
+        try:
+            conn.close()
+        except:
+            pass
+        conn.logout()
 
-######################################################### WRITE TO SPREADSHEET
+    #number of spam emails now stored in count variable
+    ######################################################### WRITE TO SPREADSHEET
 
-wb = xl.load_workbook('/Users/BlakeHord/Desktop/College Spam Count.xlsx')
-sheet = wb.active
+    wb = xl.load_workbook(excel_name)
+    sheet = wb.active
 
-for num in range(2,MAXROW + 1):
-    cell_str = 'B' + str(num)
-    cell = sheet[cell_str]
+    for num in range(2,MAXROW + 1):
+        cell_str = 'B' + str(num)
+        cell = sheet[cell_str]
+        if cell.value == None:
+            cell.value = count
+            print
+            print "New Cell Value:", count
+            break
 
-    if cell.value == None:
-        cell.value = count
-        print
-        print "New Cell Value:", count
-        break
+    #set_averages(sheet) #uncomment if you want to redo the formulas for weekday averages
+    '''
+    ws = wb.active
+    ctr = 1
+    for row in ws.iter_rows('B2:B250'):
+        if len(row) == 0:
+            print(ctr, "Empty")
+        else:
+            print(ctr, "Not Empty", ws.cell(row=row, column=2).value)
+        ctr += 1
+    '''
+    wb.save(excel_name)
 
-#set_averages(sheet) #uncomment if you want to redo the formulas for weekday averages
-
-'''
-ws = wb.active
-
-ctr = 1
-
-for row in ws.iter_rows('B2:B250'):
-    if len(row) == 0:
-        print(ctr, "Empty")
-    else:
-        print(ctr, "Not Empty", ws.cell(row=row, column=2).value)
-    ctr += 1
-
-'''
-wb.save('/Users/BlakeHord/Desktop/College Spam Count.xlsx')
+job()
